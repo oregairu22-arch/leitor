@@ -42,7 +42,7 @@
 
     <script>
         // CONFIGURAÇÃO: Digite a URL do seu blogger aqui (sem https:// e sem barra final)
-        const URL_DO_BLOG = "yanderescan.blogspot.com"; 
+        const URL_DO_BLOG = "://blogspot.com"; 
 
         const urlParams = new URLSearchParams(window.location.search);
         const mangaParametros = urlParams.get('manga');
@@ -78,9 +78,7 @@
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
                 
-                let entradas = Array.isArray(data.feed.entry) ? data.feed.entry : [data.feed.entry];
-                
-                entradas.forEach(post => {
+                data.feed.entry.forEach(post => {
                     if (post.category) {
                         post.category.forEach(cat => {
                             if (cat.term && cat.term.startsWith(mangaNomeBase + "-")) {
@@ -107,32 +105,30 @@
         window.processarPaginasManga = function(data) {
             clearTimeout(timeoutSeguranca);
             try {
-                if (!data || !data.feed || !data.feed.entry) {
-                    statusMsg.textContent = "Capítulo não encontrado no Blogger.";
+                // Se a busca de posts vier vazia
+                if (!data || !data.feed || !data.feed.entry || data.feed.entry.length === 0) {
+                    statusMsg.innerHTML = `Marcador não encontrado!<br><br>
+                    <span style="color:#aaa; font-weight:normal; font-size:14px;">
+                    O leitor procurou pela tag "<strong>${mangaParametros}</strong>" no seu blog, mas não achou nenhuma postagem com ela.<br>
+                    Vá no seu painel do Blogger e garanta que o seu post tem exatamente o marcador: <strong>${mangaParametros}</strong>
+                    </span>`;
                     return;
                 }
 
-                // Correção Crítica: Pega o primeiro item se for um Array
-                const postagem = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
-
-                if (!postagem) {
-                    statusMsg.textContent = "Nenhuma postagem correspondente encontrada.";
-                    return;
-                }
+                // Pega a primeira postagem retornada (já que filtramos por marcador único)
+                const postagem = data.feed.entry[0];
                 
                 const tituloPost = postagem.title ? (postagem.title['\$t'] || postagem.title) : "Capítulo";
                 const conteudoPost = postagem.content ? (postagem.content['\$t'] || postagem.content) : "";
                 
                 document.title = typeof tituloPost === 'object' ? tituloPost['\$t'] : tituloPost;
-                
-                const selectCapLabel = document.getElementById('select-capitulo');
-                
+
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = typeof conteudoPost === 'object' ? conteudoPost['\$t'] : conteudoPost;
                 const imagensTags = tempDiv.getElementsByTagName('img');
 
                 if (imagensTags.length === 0) {
-                    statusMsg.textContent = "Este post não possui imagens ou páginas.";
+                    statusMsg.textContent = "Este post do Blogger foi encontrado, mas não possui imagens dentro dele.";
                     return;
                 }
 
@@ -187,9 +183,10 @@
         function carregarSistema() {
             if (!mangaParametros) {
                 clearTimeout(timeoutSeguranca);
-                statusMsg.innerHTML = "URL Incompleta.<br><small>Acesse usando: ?manga=nome-do-manga-1</small>";
-                return;
 Use o código com cuidado.
+statusMsg.innerHTML = "URL Incompleta.
+Acesse usando: ?manga=nome-do-manga-1";
+return;
 }
 const scriptPost = document.createElement('script');
 scriptPost.src = https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1;
