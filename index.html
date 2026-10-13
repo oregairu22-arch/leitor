@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Mangá - Profissional</title>
+    <title>Leitor de Mangá</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background-color: #121212; color: #fff; font-family: sans-serif; padding-top: 70px; user-select: none; }
@@ -16,7 +16,6 @@
         .mode-cascade img { max-width: 100%; height: auto; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: block; }
         .mode-single img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.7); }
         .msg { text-align: center; padding: 40px; color: #ff4757; font-weight: bold; line-height: 1.6; }
-        .debug-box { background: #222; border: 1px dashed #555; padding: 15px; margin-top: 20px; border-radius: 5px; text-align: left; width: 100%; max-width: 600px; font-family: monospace; color: #aaa; }
         #page-counter { font-size: 13px; color: #a4b0be; font-weight: bold; }
     </style>
 </head>
@@ -25,7 +24,7 @@
     <header>
         <div class="controls">
             <button id="btn-ant" class="btn-nav">◀ Ant</button>
-            <select id="select-capitulo"><option value="">Aguardando capítulos...</option></select>
+            <select id="select-capitulo"><option value="">Carregando capítulos...</option></select>
             <button id="btn-prox" class="btn-nav">Prox ▶</button>
             
             <select id="select-modo">
@@ -39,17 +38,10 @@
 
     <main id="manga-container" class="mode-cascade">
         <p id="status-msg" class="msg" style="color: #888;">Conectando ao banco de dados do Blogger...</p>
-        
-        <div class="debug-box">
-            <p><strong>Painel de Diagnóstico do Leitor:</strong></p>
-            <p id="debug-url-blog">- Configurando link do Blog...</p>
-            <p id="debug-marcador">- Validando marcador recebido...</p>
-            <p id="debug-api-status">- Aguardando retorno da API da Google...</p>
-        </div>
     </main>
 
     <script>
-        // CONFIGURAÇÃO: Digite a URL do seu blogger aqui (sem https:// e sem barra final)
+        // CONFIGURAÇÃO: Coloque o domínio do seu blog de verdade aqui (Sem https:// e sem barra no final)
         const URL_DO_BLOG = "yanderescan.blogspot.com"; 
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -63,10 +55,6 @@
         const selectModo = document.getElementById('select-modo');
         const pageCounter = document.getElementById('page-counter');
 
-        // Atualiza a tela com o diagnóstico inicial
-        document.getElementById('debug-url-blog').innerHTML = `✔ Blog Alvo: <span style='color:#5af'>https://${URL_DO_BLOG}</span>`;
-        document.getElementById('debug-marcador').innerHTML = `✔ Procurando Marcador: <span style='color:#5af'>"${mangaParametros}"</span>`;
-
         let mangaNomeBase = "";
         let capituloAtual = 1;
         let listaImagens = [];
@@ -79,32 +67,27 @@
             mangaNomeBase = partes.join('-');
         }
 
-        // TIMER DE SEGURANÇA: Executado se a resposta demorar mais de 5 segundos
+        // Caso a resposta demore, exibe mensagem amigável após 5 segundos
         const timeoutSeguranca = setTimeout(() => {
-            statusMsg.textContent = "Erro: Sem resposta do servidor!";
-            document.getElementById('debug-api-status').innerHTML = `❌ <span style='color:#f47'>A API do Google/Blogger não respondeu.</span> Verifique:<br>
-            1. Se o endereço do blog "<strong>${URL_DO_BLOG}</strong>" está correto no código.<br>
-            2. Se o marcador "<strong>${mangaParametros}</strong>" existe exatamente igual no Blogger.<br>
-            3. Se o acesso à leitura do seu blog está configurado como 'Público'.`;
+            statusMsg.innerHTML = `O Blogger demorou para responder.<br><br>
+            <small style="color:#aaa;font-weight:normal;">Verifique se o domínio <strong>${URL_DO_BLOG}</strong> está correto, se o marcador <strong>${mangaParametros}</strong> existe e se o blog está configurado como 'Público'.</small>`;
         }, 5000);
 
-        // API 1: Processa e preenche a lista do Dropdown de Capítulos
+        // API 1: Monta a lista dropdown com os capítulos
         window.listarCapitulosBlogger = function(data) {
-            if (data && data.feed) {
+            if (data && data.feed && data.feed.entry) {
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
-                if (data.feed.entry) {
-                    data.feed.entry.forEach(post => {
-                        if (post.category) {
-                            post.category.forEach(cat => {
-                                if (cat.term.startsWith(mangaNomeBase + "-")) {
-                                    let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
-                                    if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) capsEncontrados.push(numCap);
-                                }
-                            });
-                        }
-                    });
-                }
+                data.feed.entry.forEach(post => {
+                    if (post.category) {
+                        post.category.forEach(cat => {
+                            if (cat.term.startsWith(mangaNomeBase + "-")) {
+                                let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
+                                if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) capsEncontrados.push(numCap);
+                            }
+                        });
+                    }
+                });
                 
                 capsEncontrados.sort((a, b) => b - a);
                 capsEncontrados.forEach(cap => {
@@ -114,25 +97,18 @@
                     if (cap === capituloAtual) opt.selected = true;
                     selectCapitulo.appendChild(opt);
                 });
-                
-                if (capsEncontrados.length === 0) {
-                    selectCapitulo.innerHTML = "<option value=''>Menu indisponível</option>";
-                }
+                if(capsEncontrados.length === 0) selectCapitulo.innerHTML = "<option>Nenhum capítulo</option>";
             }
         };
 
-        // API 2: Extrai e organiza as imagens do capítulo na tela
+        // API 2: Carrega as imagens do post atual
         window.processarPaginasManga = function(data) {
-            clearTimeout(timeoutSeguranca); // Resposta recebida, cancela o timer de erro!
-            document.getElementById('debug-api-status').innerHTML = "✔ <span style='color:#5f5'>Dados recebidos da Google!</span>";
-            
+            clearTimeout(timeoutSeguranca);
             try {
                 if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
-                    statusMsg.textContent = "Marcador não encontrado";
-                    container.innerHTML += `<p class='msg'>Verifique se o marcador "<strong>${mangaParametros}</strong>" está correto no post.</p>`;
+                    statusMsg.textContent = "Capítulo não encontrado";
                     return;
                 }
-
                 const postagem = data.feed.entry;
                 document.title = postagem.title['\$t'];
 
@@ -141,8 +117,7 @@
                 const imagensTags = tempDiv.getElementsByTagName('img');
 
                 if (imagensTags.length === 0) {
-                    statusMsg.textContent = "Sem imagens";
-                    container.innerHTML += `<p class='msg'>Post encontrado, mas nenhuma imagem foi inserida nele.</p>`;
+                    statusMsg.textContent = "Este post não possui imagens.";
                     return;
                 }
 
@@ -152,21 +127,14 @@
                     urlLimpa = urlLimpa.replace(/=w[0-9]+-h[0-9]+.*/, '=s0');
                     listaImagens.push(urlLimpa);
                 }
-
                 renderizarLeitor();
-
             } catch (error) {
-                statusMsg.textContent = "Erro de Processamento";
-                container.innerHTML += `<p class='msg'>${error.message}</p>`;
+                statusMsg.textContent = "Erro: " + error.message;
             }
         };
 
-        // Renderiza o leitor baseado no modo ativo (Cascata ou Página por Página)
         function renderizarLeitor() {
-            const debugBox = document.querySelector('.debug-box');
-            if (debugBox) debugBox.style.display = 'none'; // Esconde o painel de debug
             container.innerHTML = "";
-            
             if (modoLeitura === "cascade") {
                 container.className = "mode-cascade";
                 pageCounter.style.display = "none";
@@ -180,50 +148,42 @@
                 container.className = "mode-single";
                 pageCounter.style.display = "inline";
                 pageCounter.textContent = `Pág: ${indexPaginaAtual + 1} / ${listaImagens.length}`;
-
                 const img = document.createElement('img');
                 img.src = listaImagens[indexPaginaAtual];
-                
-                // Mapeamento de cliques (Esquerda/Direita) para navegação por páginas
                 img.addEventListener('click', (e) => {
-                    const larguraImagem = img.clientWidth;
-Use o código com cuidado.
-if (e.offsetX > larguraImagem / 2) {
-if (indexPaginaAtual < listaImagens.length - 1) {
-indexPaginaAtual++; renderizarLeitor(); window.scrollTo(0,0);
-} else { btnProx.click(); }
-} else {
-if (indexPaginaAtual > 0) {
-indexPaginaAtual--; renderizarLeitor(); window.scrollTo(0,0);
-} else { btnAnt.click(); }
-}
-});
-container.appendChild(img);
-}
-}
-// Navegação entre capítulos e alteração de modo
-selectCapitulo.addEventListener('change', (e) => { if (e.target.value) window.location.search = ?manga=${e.target.value}; });
-btnAnt.onclick = () => { if (capituloAtual > 1) window.location.search = ?manga=${mangaNomeBase}-${capituloAtual - 1}; };
-btnProx.onclick = () => { window.location.search = ?manga=${mangaNomeBase}-${capituloAtual + 1}; };
-if (capituloAtual <= 1) btnAnt.disabled = true;
-selectModo.addEventListener('change', (e) => {
-modoLeitura = e.target.value;
-indexPaginaAtual = 0;
-renderizarLeitor();
-});
-// Injeção de scripts JSONP dinâmicos
-function carregarSistema() {
-if (!mangaParametros) {
-clearTimeout(timeoutSeguranca);
-statusMsg.textContent = "URL Incompleta";
-container.innerHTML = <p class="msg">Acesse adicionando o capítulo no link.<br>Exemplo: <strong>?manga=nome-do-manga-1</strong></p>;
-return;
-}
-const scriptPost = document.createElement('script');
-scriptPost.src = https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1;
-document.body.appendChild(scriptPost);
-const scriptLista = document.createElement('script');
-scriptLista.src = https://${URL_DO_BLOG}/feeds/posts/default?alt=json-in-script&callback=listarCapitulosBlogger&max-results=50;
-document.body.appendChild(scriptLista);
-}
-carregarSistema();
+                    if (e.offsetX > img.clientWidth / 2) {
+                        if (indexPaginaAtual < listaImagens.length - 1) { indexPaginaAtual++; renderizarLeitor(); window.scrollTo(0,0); }
+                        else { btnProx.click(); }
+                    } else {
+                        if (indexPaginaAtual > 0) { indexPaginaAtual--; renderizarLeitor(); window.scrollTo(0,0); }
+                        else { btnAnt.click(); }
+                    }
+                });
+                container.appendChild(img);
+            }
+        }
+
+        selectCapitulo.addEventListener('change', (e) => { if (e.target.value) window.location.search = `?manga=${e.target.value}`; });
+        btnAnt.onclick = () => { if (capituloAtual > 1) window.location.search = `?manga=${mangaNomeBase}-${capituloAtual - 1}`; };
+        btnProx.onclick = () => { window.location.search = `?manga=${mangaNomeBase}-${capituloAtual + 1}`; };
+        if (capituloAtual <= 1) btnAnt.disabled = true;
+        selectModo.addEventListener('change', (e) => { modoLeitura = e.target.value; indexPaginaAtual = 0; renderizarLeitor(); });
+
+        function carregarSistema() {
+            if (!mangaParametros) {
+                clearTimeout(timeoutSeguranca);
+                statusMsg.innerHTML = "URL Incompleta.<br><small>Acesse usando: ?manga=nome-do-manga-1</small>";
+                return;
+            }
+            const scriptPost = document.createElement('script');
+            scriptPost.src = `https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1`;
+            document.body.appendChild(scriptPost);
+
+            const scriptLista = document.createElement('script');
+            scriptLista.src = `https://${URL_DO_BLOG}/feeds/posts/default?alt=json-in-script&callback=listarCapitulosBlogger&max-results=50`;
+            document.body.appendChild(scriptLista);
+        }
+        carregarSistema();
+    </script>
+</body>
+</html>
