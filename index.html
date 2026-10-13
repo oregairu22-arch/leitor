@@ -67,7 +67,6 @@
             mangaNomeBase = partes.join('-');
         }
 
-        // Caso a resposta demore, exibe mensagem amigável após 5 segundos
         const timeoutSeguranca = setTimeout(() => {
             statusMsg.innerHTML = `O Blogger demorou para responder.<br><br>
             <small style="color:#aaa;font-weight:normal;">Verifique se o domínio <strong>${URL_DO_BLOG}</strong> está correto, se o marcador <strong>${mangaParametros}</strong> existe e se o blog está configurado como 'Público'.</small>`;
@@ -78,7 +77,11 @@
             if (data && data.feed && data.feed.entry) {
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
-                data.feed.entry.forEach(post => {
+                
+                // Trata se for uma única entrada ou array
+                let entradas = Array.isArray(data.feed.entry) ? data.feed.entry : [data.feed.entry];
+                
+                entradas.forEach(post => {
                     if (post.category) {
                         post.category.forEach(cat => {
                             if (cat.term && cat.term.startsWith(mangaNomeBase + "-")) {
@@ -105,24 +108,22 @@
         window.processarPaginasManga = function(data) {
             clearTimeout(timeoutSeguranca);
             try {
-                // Tratamento seguro para verificar se a entrada existe de forma flexível
                 let entrada = null;
-                if (data && data.feed && data.feed.entry) {
-                    entrada = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
+                if (data && data.feed) {
+                    if (data.feed.entry) {
+                        entrada = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
+                    }
                 }
 
                 if (!entrada) {
-                    statusMsg.textContent = "Capítulo não encontrado";
+                    statusMsg.textContent = "Capítulo não encontrado no Blogger.";
                     return;
                 }
                 
-                // Leitura segura do título e conteúdo aceitando chaves diretas ou objeto \$t
                 const tituloPost = entrada.title ? (entrada.title['\$t'] || entrada.title) : "Capítulo";
                 const conteudoPost = entrada.content ? (entrada.content['\$t'] || entrada.content) : "";
                 
                 document.title = typeof tituloPost === 'object' ? tituloPost['\$t'] : tituloPost;
-                titleElement = document.getElementById('manga-title') || titleElement;
-                if(titleElement) titleElement.textContent = document.title;
 
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = typeof conteudoPost === 'object' ? conteudoPost['\$t'] : conteudoPost;
@@ -188,14 +189,11 @@
                 return;
             }
             const scriptPost = document.createElement('script');
-            scriptPost.src = `https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1`;
-            document.body.appendChild(scriptPost);
-
-            const scriptLista = document.createElement('script');
-            scriptLista.src = `https://${URL_DO_BLOG}/feeds/posts/default?alt=json-in-script&callback=listarCapitulosBlogger&max-results=50`;
-            document.body.appendChild(scriptLista);
-        }
-        carregarSistema();
-    </script>
-</body>
-</html>
+Use o código com cuidado.
+scriptPost.src = https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1;
+document.body.appendChild(scriptPost);
+const scriptLista = document.createElement('script');
+scriptLista.src = https://${URL_DO_BLOG}/feeds/posts/default?alt=json-in-script&callback=listarCapitulosBlogger&max-results=50;
+document.body.appendChild(scriptLista);
+}
+carregarSistema();
