@@ -81,7 +81,7 @@
                 data.feed.entry.forEach(post => {
                     if (post.category) {
                         post.category.forEach(cat => {
-                            if (cat.term.startsWith(mangaNomeBase + "-")) {
+                            if (cat.term && cat.term.startsWith(mangaNomeBase + "-")) {
                                 let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
                                 if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) capsEncontrados.push(numCap);
                             }
@@ -105,15 +105,27 @@
         window.processarPaginasManga = function(data) {
             clearTimeout(timeoutSeguranca);
             try {
-                if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
+                // Tratamento seguro para verificar se a entrada existe de forma flexível
+                let entrada = null;
+                if (data && data.feed && data.feed.entry) {
+                    entrada = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
+                }
+
+                if (!entrada) {
                     statusMsg.textContent = "Capítulo não encontrado";
                     return;
                 }
-                const postagem = data.feed.entry;
-                document.title = postagem.title['\$t'];
+                
+                // Leitura segura do título e conteúdo aceitando chaves diretas ou objeto \$t
+                const tituloPost = entrada.title ? (entrada.title['\$t'] || entrada.title) : "Capítulo";
+                const conteudoPost = entrada.content ? (entrada.content['\$t'] || entrada.content) : "";
+                
+                document.title = typeof tituloPost === 'object' ? tituloPost['\$t'] : tituloPost;
+                titleElement = document.getElementById('manga-title') || titleElement;
+                if(titleElement) titleElement.textContent = document.title;
 
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = postagem.content['\$t'];
+                tempDiv.innerHTML = typeof conteudoPost === 'object' ? conteudoPost['\$t'] : conteudoPost;
                 const imagensTags = tempDiv.getElementsByTagName('img');
 
                 if (imagensTags.length === 0) {
@@ -129,7 +141,7 @@
                 }
                 renderizarLeitor();
             } catch (error) {
-                statusMsg.textContent = "Erro: " + error.message;
+                statusMsg.textContent = "Erro de leitura: " + error.message;
             }
         };
 
