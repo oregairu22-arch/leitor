@@ -87,20 +87,22 @@
 
         // 1. CARREGAR PARTE 1: Buscar a lista de capítulos disponíveis no Blogger
         window.listarCapitulosBlogger = function(data) {
-            if (data.feed &amp;&amp; data.feed.entry) {
+            if (data.feed && data.feed.entry) {
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
 
                 data.feed.entry.forEach(post => {
                     // Procura os marcadores para descobrir o número do capítulo
-                    post.category.forEach(cat => {
-                        if (cat.term.startsWith(mangaNomeBase + "-")) {
-                            let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
-                            if (!isNaN(numCap) &amp;&amp; !capsEncontrados.includes(numCap)) {
-                                capsEncontrados.push(numCap);
+                    if (post.category) {
+                        post.category.forEach(cat => {
+                            if (cat.term.startsWith(mangaNomeBase + "-")) {
+                                let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
+                                if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) {
+                                    capsEncontrados.push(numCap);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 });
 
                 // Ordena os capítulos do maior para o menor (Estilo scanlation)
@@ -113,6 +115,10 @@
                     if (cap === capituloAtual) opt.selected = true;
                     selectCapitulo.appendChild(opt);
                 });
+                
+                if (capsEncontrados.length === 0) {
+                    selectCapitulo.innerHTML = "<option value=''>Nenhum menu gerado</option>";
+                }
             }
         };
 
@@ -129,7 +135,7 @@
                     return;
                 }
 
-                const postagem = data.feed.entry[0];
+                const postagem = data.feed.entry;
                 document.title = postagem.title['\$t'];
 
                 const tempDiv = document.createElement('div');
@@ -209,13 +215,12 @@
 
         // Controle dos botões Ant e Prox do topo
         btnAnt.onclick = () => { if (capituloAtual > 1) window.location.search = `?manga=${mangaNomeBase}-${capituloAtual - 1}`; };
-        btnProx.onclick = () => { window.location.search = `?manga=${mangaNomeBase}-${capituloAtual + 1}`; };
-        if (capituloAtual <= 1) btnAnt.disabled = true;
-
-        // Monitor do seletor de modos (Cascata vs Página por Página)
-        selectModo.addEventListener('change', (e) => {
-            modoLeitura = e.target.value;
 Use o código com cuidado.
+btnProx.onclick = () => { window.location.search = ?manga=${mangaNomeBase}-${capituloAtual + 1}; };
+if (capituloAtual <= 1) btnAnt.disabled = true;
+// Monitor do seletor de modos (Cascata vs Página por Página)
+selectModo.addEventListener('change', (e) => {
+modoLeitura = e.target.value;
 indexPaginaAtual = 0;
 renderizarLeitor();
 });
