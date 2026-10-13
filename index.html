@@ -41,7 +41,7 @@
     </main>
 
     <script>
-        // CONFIGURAÇÃO: Coloque o domínio do seu blog de verdade aqui (Sem https:// e sem barra no final)
+        // CONFIGURAÇÃO: Digite a URL do seu blogger aqui (sem https:// e sem barra final)
         const URL_DO_BLOG = "yanderescan.blogspot.com"; 
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -69,16 +69,15 @@
 
         const timeoutSeguranca = setTimeout(() => {
             statusMsg.innerHTML = `O Blogger demorou para responder.<br><br>
-            <small style="color:#aaa;font-weight:normal;">Verifique se o domínio <strong>${URL_DO_BLOG}</strong> está correto, se o marcador <strong>${mangaParametros}</strong> existe e se o blog está configurado como 'Público'.</small>`;
-        }, 5000);
+            <small style="color:#aaa;font-weight:normal;">Verifique se o domínio <strong>${URL_DO_BLOG}</strong> está correto, se o marcador <strong>${mangaParametros}</strong> existe e se o blog está público.</small>`;
+        }, 6000);
 
-        // API 1: Monta a lista dropdown com os capítulos
+        // API 1: Monta a lista dropdown de capítulos
         window.listarCapitulosBlogger = function(data) {
             if (data && data.feed && data.feed.entry) {
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
                 
-                // Trata se for uma única entrada ou array
                 let entradas = Array.isArray(data.feed.entry) ? data.feed.entry : [data.feed.entry];
                 
                 entradas.forEach(post => {
@@ -104,33 +103,36 @@
             }
         };
 
-        // API 2: Carrega as imagens do post atual
+        // API 2: Extrai as imagens de dentro da postagem encontrada
         window.processarPaginasManga = function(data) {
             clearTimeout(timeoutSeguranca);
             try {
-                let entrada = null;
-                if (data && data.feed) {
-                    if (data.feed.entry) {
-                        entrada = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
-                    }
-                }
-
-                if (!entrada) {
+                if (!data || !data.feed || !data.feed.entry) {
                     statusMsg.textContent = "Capítulo não encontrado no Blogger.";
                     return;
                 }
+
+                // Correção Crítica: Pega o primeiro item se for um Array
+                const postagem = Array.isArray(data.feed.entry) ? data.feed.entry[0] : data.feed.entry;
+
+                if (!postagem) {
+                    statusMsg.textContent = "Nenhuma postagem correspondente encontrada.";
+                    return;
+                }
                 
-                const tituloPost = entrada.title ? (entrada.title['\$t'] || entrada.title) : "Capítulo";
-                const conteudoPost = entrada.content ? (entrada.content['\$t'] || entrada.content) : "";
+                const tituloPost = postagem.title ? (postagem.title['\$t'] || postagem.title) : "Capítulo";
+                const conteudoPost = postagem.content ? (postagem.content['\$t'] || postagem.content) : "";
                 
                 document.title = typeof tituloPost === 'object' ? tituloPost['\$t'] : tituloPost;
-
+                
+                const selectCapLabel = document.getElementById('select-capitulo');
+                
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = typeof conteudoPost === 'object' ? conteudoPost['\$t'] : conteudoPost;
                 const imagensTags = tempDiv.getElementsByTagName('img');
 
                 if (imagensTags.length === 0) {
-                    statusMsg.textContent = "Este post não possui imagens.";
+                    statusMsg.textContent = "Este post não possui imagens ou páginas.";
                     return;
                 }
 
@@ -142,7 +144,7 @@
                 }
                 renderizarLeitor();
             } catch (error) {
-                statusMsg.textContent = "Erro de leitura: " + error.message;
+                statusMsg.textContent = "Erro no processamento: " + error.message;
             }
         };
 
@@ -187,9 +189,9 @@
                 clearTimeout(timeoutSeguranca);
                 statusMsg.innerHTML = "URL Incompleta.<br><small>Acesse usando: ?manga=nome-do-manga-1</small>";
                 return;
-            }
-            const scriptPost = document.createElement('script');
 Use o código com cuidado.
+}
+const scriptPost = document.createElement('script');
 scriptPost.src = https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1;
 document.body.appendChild(scriptPost);
 const scriptLista = document.createElement('script');
