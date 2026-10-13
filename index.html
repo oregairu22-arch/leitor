@@ -3,31 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de Mangá Profissional</title>
+    <title>Leitor de Mangá - Diagnóstico</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background-color: #121212; color: #fff; font-family: sans-serif; padding-top: 70px; user-select: none; }
-        
-        /* Barra Superior Estilo FoolSlide */
         header { position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: #1e1e1e; border-bottom: 2px solid #333; display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; padding: 0 10px; }
-        
-        /* Botões e Seletores */
-        .btn-nav { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s; }
-        .btn-nav:hover { background-color: #ff6b81; }
+        .btn-nav { background-color: #ff4757; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-nav:disabled { background-color: #444; color: #888; cursor: not-allowed; }
-        
-        select { background: #2f3542; color: white; border: 1px solid #57606f; padding: 6px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; outline: none; }
-        
-        /* Container do Leitor */
-        #manga-container { display: flex; flex-direction: column; align-items: center; max-width: 800px; margin: 20px auto; padding: 0 10px; position: relative; }
-        
-        /* Estilos de Imagem por Modo */
+        select { background: #2f3542; color: white; border: 1px solid #57606f; padding: 6px 10px; border-radius: 4px; font-weight: bold; }
+        #manga-container { display: flex; flex-direction: column; align-items: center; max-width: 800px; margin: 20px auto; padding: 0 10px; }
         .mode-cascade img { max-width: 100%; height: auto; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: block; }
-        
-        .mode-single img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; box-shadow: 0 4px 20px rgba(0,0,0,0.7); cursor: pointer; }
-        
+        .mode-single img { max-width: 100%; max-height: calc(100vh - 110px); object-fit: contain; cursor: pointer; }
         .msg { text-align: center; padding: 40px; color: #ff4757; font-weight: bold; line-height: 1.6; }
+        .debug-box { background: #222; border: 1px dashed #555; padding: 15px; margin-top: 20px; border-radius: 5px; text-align: left; width: 100%; max-width: 600px; font-family: monospace; color: #aaa; }
         #page-counter { font-size: 13px; color: #a4b0be; font-weight: bold; }
     </style>
 </head>
@@ -36,78 +25,81 @@
     <header>
         <div class="controls">
             <button id="btn-ant" class="btn-nav">◀ Ant</button>
-            
-            <!-- Caixa de Seleção de Capítulos -->
-            <select id="select-capitulo">
-                <option value="">Carregando capítulos...</option>
-            </select>
-            
+            <select id="select-capitulo"><option value="">Aguardando dados...</option></select>
             <button id="btn-prox" class="btn-nav">Prox ▶</button>
-            
-            <!-- Alternador de Modo de Leitura -->
-            <select id="select-modo">
-                <option value="cascade">Modo: Cascata</option>
-                <option value="single">Modo: Página por Página</option>
-            </select>
-            
+            <b:if expr='data:view.isPost'><select id="select-modo"><option value="cascade">Modo: Cascata</option><option value="single">Modo: Página por Página</option></select></b:if>
             <span id="page-counter" style="display: none;">Pág: 1/1</span>
         </div>
     </header>
 
     <main id="manga-container" class="mode-cascade">
         <p id="status-msg" class="msg" style="color: #888;">Conectando ao servidor do Blogger...</p>
+        
+        <div class="debug-box">
+            <p><strong>Painel de Diagnóstico do Leitor:</strong></p>
+            <p id="debug-url-blog">- Carregando configuração do Blog...</p>
+            <p id="debug-marcador">- Carregando marcador recebido...</p>
+            <p id="debug-api-status">- Aguardando resposta da API do Google...</p>
+        </div>
     </main>
 
     <script>
         // CONFIGURAÇÃO: Digite a URL do seu blogger aqui (sem https:// e sem barra final)
-        const URL_DO_BLOG = "yanderescan.blogspot.com"; 
+        const URL_DO_BLOG = "SEU_://blogspot.com"; 
 
         const urlParams = new URLSearchParams(window.location.search);
         const mangaParametros = urlParams.get('manga');
 
         const container = document.getElementById('manga-container');
+        const statusMsg = document.getElementById('status-msg');
         const btnAnt = document.getElementById('btn-ant');
         const btnProx = document.getElementById('btn-prox');
         const selectCapitulo = document.getElementById('select-capitulo');
         const selectModo = document.getElementById('select-modo');
         const pageCounter = document.getElementById('page-counter');
 
+        // Elementos do Diagnóstico
+        document.getElementById('debug-url-blog').innerHTML = `✔ Blog Alvo: <span style='color:#5af'>https://${URL_DO_BLOG}</span>`;
+        document.getElementById('debug-marcador').innerHTML = `✔ Procurando Marcador: <span style='color:#5af'>"${mangaParametros}"</span>`;
+
         let mangaNomeBase = "";
         let capituloAtual = 1;
         let listaImagens = [];
         let indexPaginaAtual = 0;
-        let modoLeitura = "cascade"; // cascade ou single
+        let modoLeitura = "cascade";
 
-        // Separa o Nome do Capítulo baseado no hífen
         if (mangaParametros) {
             const partes = mangaParametros.split('-');
             capituloAtual = parseInt(partes.pop());
             mangaNomeBase = partes.join('-');
         }
 
-        // 1. CARREGAR PARTE 1: Buscar a lista de capítulos disponíveis no Blogger
+        // TIMER DE SEGURANÇA: Se em 5 segundos a Google não responder, avisa o que houve
+        const timeoutSeguranca = setTimeout(() => {
+            statusMsg.textContent = "Erro: Tempo de resposta esgotado!";
+            document.getElementById('debug-api-status').innerHTML = `❌ <span style='color:#f47'>O Blogger não respondeu.</span> Possíveis causas:<br>
+            1. O link do blog "<strong>${URL_DO_BLOG}</strong>" está digitado errado no código.<br>
+            2. O marcador "<strong>${mangaParametros}</strong>" não existe em nenhum post publicado.<br>
+            3. Seu blog está configurado como 'Privado' nas configurações do Blogger.`;
+        }, 5000);
+
         window.listarCapitulosBlogger = function(data) {
-            if (data.feed && data.feed.entry) {
+            if (data && data.feed) {
                 selectCapitulo.innerHTML = "";
                 let capsEncontrados = [];
-
-                data.feed.entry.forEach(post => {
-                    // Procura os marcadores para descobrir o número do capítulo
-                    if (post.category) {
-                        post.category.forEach(cat => {
-                            if (cat.term.startsWith(mangaNomeBase + "-")) {
-                                let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
-                                if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) {
-                                    capsEncontrados.push(numCap);
+                if (data.feed.entry) {
+                    data.feed.entry.forEach(post => {
+                        if (post.category) {
+                            post.category.forEach(cat => {
+                                if (cat.term.startsWith(mangaNomeBase + "-")) {
+                                    let numCap = parseInt(cat.term.replace(mangaNomeBase + "-", ""));
+                                    if (!isNaN(numCap) && !capsEncontrados.includes(numCap)) capsEncontrados.push(numCap);
                                 }
-                            }
-                        });
-                    }
-                });
-
-                // Ordena os capítulos do maior para o menor (Estilo scanlation)
+                            });
+                        }
+                    });
+                }
                 capsEncontrados.sort((a, b) => b - a);
-
                 capsEncontrados.forEach(cap => {
                     const opt = document.createElement('option');
                     opt.value = `${mangaNomeBase}-${cap}`;
@@ -115,23 +107,17 @@
                     if (cap === capituloAtual) opt.selected = true;
                     selectCapitulo.appendChild(opt);
                 });
-                
-                if (capsEncontrados.length === 0) {
-                    selectCapitulo.innerHTML = "<option value=''>Nenhum menu gerado</option>";
-                }
             }
         };
 
-        // Evento de mudança no dropdown de capítulos
-        selectCapitulo.addEventListener('change', (e) => {
-            if (e.target.value) window.location.search = `?manga=${e.target.value}`;
-        });
-
-        // 2. CARREGAR PARTE 2: Renderizar as imagens do capítulo atual
         window.processarPaginasManga = function(data) {
+            clearTimeout(timeoutSeguranca); // Cancela o aviso de erro pois a Google respondeu!
+            document.getElementById('debug-api-status').innerHTML = "✔ <span style='color:#5f5'>Conexão estabelecida com sucesso!</span>";
+            
             try {
                 if (!data.feed || !data.feed.entry || data.feed.entry.length === 0) {
-                    container.innerHTML = `<p class="msg">Capítulo não encontrado ou ainda não lançado.</p>`;
+                    statusMsg.textContent = "Capítulo não encontrado";
+                    container.innerHTML += `<p class='msg'>Verifique se o marcador "<strong>${mangaParametros}</strong>" está idêntico ao do post no Blogger.</p>`;
                     return;
                 }
 
@@ -143,7 +129,8 @@
                 const imagensTags = tempDiv.getElementsByTagName('img');
 
                 if (imagensTags.length === 0) {
-                    container.innerHTML = `<p class="msg">Nenhuma página encontrada dentro deste post.</p>`;
+                    statusMsg.textContent = "Erro de Conteúdo";
+                    container.innerHTML += `<p class='msg'>Este post foi encontrado, mas não há fotos dentro dele.</p>`;
                     return;
                 }
 
@@ -154,21 +141,24 @@
                     listaImagens.push(urlLimpa);
                 }
 
+                // Remove a caixa de diagnóstico antes de desenhar o mangá
                 renderizarLeitor();
 
             } catch (error) {
-                container.innerHTML = `<p class="msg">Erro ao renderizar: ${error.message}</p>`;
+                statusMsg.textContent = "Erro interno";
+                container.innerHTML += `<p class='msg'>${error.message}</p>`;
             }
         };
 
-        // Função responsável por desenhar a tela dependendo do modo escolhido
         function renderizarLeitor() {
+            // Remove a caixa cinza de debug ao renderizar com sucesso
+            const debugBox = document.querySelector('.debug-box');
+            if (debugBox) debugBox.style.display = 'none';
             container.innerHTML = "";
             
             if (modoLeitura === "cascade") {
                 container.className = "mode-cascade";
                 pageCounter.style.display = "none";
-                
                 listaImagens.forEach(url => {
                     const img = document.createElement('img');
                     img.src = url;
@@ -183,58 +173,43 @@
                 const img = document.createElement('img');
                 img.src = listaImagens[indexPaginaAtual];
                 
-                // Clique na imagem para passar ou voltar página
                 img.addEventListener('click', (e) => {
                     const larguraImagem = img.clientWidth;
-                    const cliqueX = e.offsetX;
-
-                    if (cliqueX > larguraImagem / 2) {
-                        // Clicou no lado direito -> Avança
+                    if (e.offsetX > larguraImagem / 2) {
                         if (indexPaginaAtual < listaImagens.length - 1) {
-                            indexPaginaAtual++;
-                            renderizarLeitor();
-                            window.scrollTo(0,0);
-                        } else {
-                            btnProx.click(); // Se for a última página, pula de capítulo
-                        }
+                            indexPaginaAtual++; renderizarLeitor(); window.scrollTo(0,0);
+                        } else { btnProx.click(); }
                     } else {
-                        // Clicou no lado esquerdo -> Volta
                         if (indexPaginaAtual > 0) {
-                            indexPaginaAtual--;
-                            renderizarLeitor();
-                            window.scrollTo(0,0);
-                        } else {
-                            btnAnt.click(); // Se for a primeira página, volta o capítulo
-                        }
-                    }
-                });
-
-                container.appendChild(img);
-            }
-        }
-
-        // Controle dos botões Ant e Prox do topo
-        btnAnt.onclick = () => { if (capituloAtual > 1) window.location.search = `?manga=${mangaNomeBase}-${capituloAtual - 1}`; };
+                            indexPaginaAtual--; renderizarLeitor(); window.scrollTo(0,0);
 Use o código com cuidado.
+} else { btnAnt.click(); }
+}
+});
+container.appendChild(img);
+}
+}
+selectCapitulo.addEventListener('change', (e) => { if (e.target.value) window.location.search = ?manga=${e.target.value}; });
+btnAnt.onclick = () => { if (capituloAtual > 1) window.location.search = ?manga=${mangaNomeBase}-${capituloAtual - 1}; };
 btnProx.onclick = () => { window.location.search = ?manga=${mangaNomeBase}-${capituloAtual + 1}; };
 if (capituloAtual <= 1) btnAnt.disabled = true;
-// Monitor do seletor de modos (Cascata vs Página por Página)
+if (selectModo) {
 selectModo.addEventListener('change', (e) => {
 modoLeitura = e.target.value;
 indexPaginaAtual = 0;
 renderizarLeitor();
 });
-// Inicializador de conexões via JSONP
+}
 function carregarSistema() {
 if (!mangaParametros) {
-container.innerHTML = <p class="msg">URL inválida. Use ?manga=nome-do-manga-1</p>;
+clearTimeout(timeoutSeguranca);
+statusMsg.textContent = "URL Incompleta";
+container.innerHTML = <p class="msg">Acesse o link adicionando o parâmetro do capítulo.<br>Exemplo: <strong>?manga=nome-do-manga-1</strong></p>;
 return;
 }
-// Script 1: Puxa o capítulo atual
 const scriptPost = document.createElement('script');
 scriptPost.src = https://${URL_DO_BLOG}/feeds/posts/default/-/${mangaParametros}?alt=json-in-script&callback=processarPaginasManga&max-results=1;
 document.body.appendChild(scriptPost);
-// Script 2: Puxa os últimos 50 posts do blog para montar a lista do Dropdown
 const scriptLista = document.createElement('script');
 scriptLista.src = https://${URL_DO_BLOG}/feeds/posts/default?alt=json-in-script&callback=listarCapitulosBlogger&max-results=50;
 document.body.appendChild(scriptLista);
